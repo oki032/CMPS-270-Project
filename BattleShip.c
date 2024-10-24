@@ -2,13 +2,13 @@
 #include <stdlib.h>
 typedef struct player {
     char name[50];
+    char grid[10][10];
 } player;
 typedef struct Ships {
     char *name;
     int size;
 } Ships;
-void CreateGrid(void) {
-    char grid[10][10]; 
+void CreateGrid(char grid[10][10]) {
     char c = 'A';
     printf("   ");
     for (int i = 0; i < 10; i++)
@@ -23,12 +23,18 @@ void CreateGrid(void) {
         printf("\n");
     }
 }
+void PlaceShip(char grid[10][10], Ships ship) {
+
+
+}
 int main() {
-    CreateGrid();
+    Ships s[]={("Carrier",5), ("BattleShip",4), ("Destroy",3)}
+    player player1, player2;
+    player player1.grid=CreateGrid();
+    player player2.grid=CreateGrid();
     printf("Difficulty: Easy(0) / Hard(1): ");
     int diff;
     scanf("%d", &diff);
-    player player1, player2;
     printf("Enter first player's name: ");
     scanf("%s", player1.name);  
     printf("Enter second player's name: ");
@@ -36,8 +42,10 @@ int main() {
     int percent = rand() % 2;  
     if (percent == 0) {
         printf("%s, place your ships\n", player1.name);
+
     } else {
         printf("%s, place your ships\n", player2.name);
     }
+
     return 0;
 }
