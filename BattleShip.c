@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 typedef struct Ship
 {
     int hits;
@@ -15,10 +16,15 @@ typedef struct player
     int radar;
     int shipsr;
     int smoke;
-    int artilary;
+    int artillery;
     char smokegrid[10][10];
     Ship ships[4];
 } player;
+void Fire(player *opponent, int row, char column, int diff, player *self);
+int RadarSweep(player *opponent, int row, int column, player *self);
+void SmokeScreen(player *opponent, int row, char column, player *self);
+void Artillery(int row, int col, char grid[10][10], player *opponent);
+void Torpedo(player *opponent, char target, int diff);
 void CreateGrid(char grid[10][10], char smokegrid[10][10])
 {
     for (int i = 0; i < 10; i++)
@@ -46,18 +52,19 @@ int compare_strings(const char *str1, const char *str2)
 void handle_move(player *current_player, player *opponent, int diff)
 {
     char command[10];
-    char column;
-    int row;
-    printf("%s, enter your move (e.g., Fire B3): ", current_player->name);
-    scanf("%s %c%d", command, &column, &row);
+    char coor[3];
+    printf("%s, Enter your move (e.g., Fire/Radar/Smoke/Artillery/Torpedo): ", current_player->name);
+    scanf("%s %s", command, coor);
+    char column = coor[0];
+    int row = coor[1] - '1';
     if (compare_strings(command, "Fire"))
     {
-        if (column < 'A' || column > 'J' || row < 0 || row > 9)
+        if ((column < 'A' || column > 'J') || (row < 0 || row > 9))
         {
             printf("Invalid coordinates. Please enter a valid move.\n");
             return;
         }
-        Fire(opponent, row, column, diff);
+        Fire(opponent, row, column, diff, current_player);
     }
     else if (compare_strings(command, "Radar"))
     {
@@ -66,7 +73,7 @@ void handle_move(player *current_player, player *opponent, int diff)
             printf("No radar sweeps remaining. Turn over.\n");
             return;
         }
-        if (column < 'A' || column > 'J' || row < 0 || row > 9)
+        if ((column < 'A' || column > 'J') || (row < 0 || row - 1 > 9))
         {
             printf("Invalid coordinates. Please enter a valid move.\n");
             return;
@@ -80,7 +87,7 @@ void handle_move(player *current_player, player *opponent, int diff)
             printf("No smoke screens remaining. Turn over.\n");
             return;
         }
-        if (column < 'A' || column > 'J' || row < 0 || row > 9)
+        if ((column < 'A' || column > 'J') || (row < 0 || row > 9))
         {
             printf("Invalid coordinates. Please enter a valid move.\n");
             return;
@@ -89,24 +96,42 @@ void handle_move(player *current_player, player *opponent, int diff)
     }
     else if (compare_strings(command, "Artillery"))
     {
-        if (column < 'A' || column > 'J' || row < 0 || row > 9)
+        if ((column < 'A' || column > 'J') || (row < 0 || row > 9))
         {
             printf("Invalid coordinates. Please enter a valid move.\n");
             return;
         }
-        Artillary(opponent, row, column, diff);
+        Artillery(row, column - 'A', opponent->grid, opponent);
     }
     else if (compare_strings(command, "Torpedo"))
     {
-        if (column < 'A' || column > 'J' || row < 0 || row > 9)
+        if ((coor[0] < 'A' || coor[0] > 'J') && (coor[1] < '1' || coor[1] > '9'))
         {
-            printf("Invalid coordinates. Please enter a valid move.\n");
+            printf("Invalid target. Please enter a valid move.\n");
             return;
         }
-        //Torpedo();
-    }
-    {
-        printf("Invalid command. Please use Fire, Radar, Smoke, or Artillery.\n");
+        if (coor[0] >= 'A' && coor[0] <= 'J')
+        {
+            column = coor[0] - 'A';
+            Torpedo(opponent, coor[0], diff);
+        }
+        else if (coor[0] >= '1' && coor[0] <= '9' && coor[1] == '\0')
+        {
+            row = coor[0] - '1';
+            Torpedo(opponent, coor[0], diff);
+        }
+        else if (coor[0] == '1' && coor[1] == '0')
+        {
+            row = 9;
+            row = (char)row;
+            Torpedo(opponent, row, diff);
+        }
+        else
+        {
+            printf("Invalid target. Please enter a valid row (1-10) or column (A-J).\n");
+            return;
+        }
+        Torpedo(opponent, coor[0], diff);
     }
 }
 void displayGrid(char grid[10][10], int diff)
@@ -114,48 +139,37 @@ void displayGrid(char grid[10][10], int diff)
     char c = 'A';
     printf("   ");
     for (int i = 0; i < 10; i++)
-        printf("%c ", c++);
+    {
+        printf("%2c ", c++);
+    }
     printf("\n");
     for (int i = 0; i < 10; i++)
     {
         printf("%2d ", i + 1);
         for (int j = 0; j < 10; j++)
         {
-            if (diff == 1)
+            if (grid[i][j] == '*')
             {
-                if (grid[i][j] == '~')
-                {
-                    printf(" ~ ");
-                }
-                else if (grid[i][j] == '*')
-                {
-                    printf(" * ");
-                }
-                else if (grid[i][j] == 'o')
-                {
-                    printf(" ~ ");
-                }
+                printf(" * ");
+            }
+            else if (diff == 0 && grid[i][j] == 'o')
+            {
+                printf(" o ");
             }
             else
             {
-                if (grid[i][j] == '~' || grid[i][j] == 'o')
-                {
-                    printf(" ~ ");
-                }
-                else if (grid[i][j] == '*')
-                {
-                    printf(" ~ ");
-                }
+                printf(" ~ ");
             }
         }
         printf("\n");
     }
 }
-void Fire(player *opponent, int row, char column, int diff)
+
+void Fire(player *opponent, int row, char column, int diff, player *self)
 {
     int col = column - 'A';
     row -= 1;
-    if (opponent->grid[row][col] == 'S')
+    if (opponent->grid[row][col] == 'S' || opponent->grid[row][col] == '*')
     {
         opponent->grid[row][col] = '*';
         printf("Hit!\n");
@@ -168,8 +182,24 @@ void Fire(player *opponent, int row, char column, int diff)
                 ship->hits++;
                 if (ship->hits == ship->size)
                 {
-                    printf("You sunk a ship!\n");
+                    if (ship->size == 5)
+                    {
+                        printf("You sunk a Carrier!\n");
+                    }
+                    else if (ship->size == 4)
+                    {
+                        printf("You sunk a Battleship!\n");
+                    }
+                    else if (ship->size == 3)
+                    {
+                        printf("You sunk a Destroyer!\n");
+                    }
+                    else if (ship->size == 2)
+                    {
+                        printf("You sunk a Submarine!\n");
+                    }
                     opponent->shipsr--;
+                    self->smoke++;
                 }
                 break;
             }
@@ -215,12 +245,12 @@ int RadarSweep(player *opponent, int row, int column, player *self)
         return 0;
     }
 }
-void SmokeScreen(player *opponent, int row, int column, player *self)
+void SmokeScreen(player *opponent, int row, char column, player *self)
 {
     int shipssunk = 4 - opponent->shipsr;
-    if (shipssunk > self->smoke)
+    if (self->smoke > 0)
     {
-        self->smoke++;
+        self->smoke--;
         int col = column - 'A';
         row -= 1;
         for (int i = row; i < row + 2 && i < 10; i++)
@@ -230,82 +260,41 @@ void SmokeScreen(player *opponent, int row, int column, player *self)
                 self->smokegrid[i][j] = '~';
             }
         }
+        system("clear");
+        printf("Smoke screen deployed.\n");
     }
-    printf("smoke screen deployed");
+    else
+    {
+        printf("No smoke screens remaining. You lose your turn.\n");
+    }
 }
-void Artillery(int row, int col, char grid[10][10], player *opponent) {
+void Artillery(int row, int col, char grid[10][10], player *opponent)
+{
     int hits = 0;
-    for (int i = 0; i < 2; i++) {
-        for (int j = 0; j < 2; j++) {
+    row = row - 1;
+    for (int i = 0; i < 2; i++)
+    {
+        for (int j = 0; j < 2; j++)
+        {
             int targetRow = row + i;
             int targetCol = col + j;
-            if (targetRow >= 0 && targetRow < 10 && targetCol >= 0 && targetCol < 10) {
-                if (grid[targetRow][targetCol] == 'S') {
-                    grid[targetRow][targetCol] = 'x'; 
+            if (targetRow >= 0 && targetRow < 10 && targetCol >= 0 && targetCol < 10)
+            {
+                if (grid[targetRow][targetCol] == 'S' || grid[targetRow][targetCol] == '*')
+                {
+                    grid[targetRow][targetCol] = '*';
                     hits++;
-                    opponent->shipsr--;
-                } else {
+                }
+                else
+                {
                     grid[targetRow][targetCol] = 'o';
                 }
             }
         }
     }
-    if (hits > 0) {
-        printf("Artillery attack hit %d target(s)!\n", hits);
-    } else {
-        printf("Artillery attack missed all targets in the 2x2 area.\n");
-    }
-}
-void Torpedo(player *opponent, char target, int diff)
-{
-    int hitcount = 0;
-    int col = -1, row = -1;
-    if (target >= 'A' && target <= 'J')
+    if (hits > 0)
     {
-        col = target - 'A';
-    }
-    else if (target >= '1' && target <= '9')
-    {
-        row = target - '1';
-    }
-    else
-    {
-        printf("Invalid target. Please enter a valid row or column.\n");
-        return;
-    }
-    if (col != -1)
-    {
-        for (int k = 0; k < 10; k++)
-        {
-            if (opponent->grid[k][col] == 'S')
-            {
-                opponent->grid[k][col] = '*';
-                hitcount++;
-            }
-            else if (diff == 0 && opponent->grid[k][col] == '~')
-            {
-                opponent->grid[k][col] = 'o';
-            }
-        }
-    }
-    else
-    {
-        for (int k = 0; k < 10; k++)
-        {
-            if (opponent->grid[row][k] == 'S')
-            {
-                opponent->grid[row][k] = '*';
-                hitcount++;
-            }
-            else if (diff == 0 && opponent->grid[row][k] == '~')
-            {
-                opponent->grid[row][k] = 'o';
-            }
-        }
-    }
-    if (hitcount > 0)
-    {
-        printf("Torpedo Hit %d times\n", hitcount);
+        printf("Artillery Hit %d times\n", hits);
         for (int i = 0; i < 4; i++)
         {
             Ship *ship = &opponent->ships[i];
@@ -332,7 +321,118 @@ void Torpedo(player *opponent, char target, int diff)
             }
             if (ship_hit_count == ship->size)
             {
-                printf("You sunk a %s!\n", (ship->size == 5) ? "Carrier" : (ship->size == 4) ? "Battleship": (ship->size == 3)   ? "Destroyer": "Submarine");
+                if (ship->size == 5)
+                {
+                    printf("You sunk a Carrier!\n");
+                }
+                else if (ship->size == 4)
+                {
+                    printf("You sunk a Battleship!\n");
+                }
+                else if (ship->size == 3)
+                {
+                    printf("You sunk a Destroyer!\n");
+                }
+                else if (ship->size == 2)
+                {
+                    printf("You sunk a Submarine!\n");
+                }
+                opponent->shipsr--;
+            }
+        }
+    }
+    else
+    {
+        printf("Miss!\n");
+    }
+}
+void Torpedo(player *opponent, char target, int diff)
+{
+    int hitcount = 0;
+    int col = -1, row = -1;
+    if ((target >= 'A' || target <= 'J'))
+    {
+        col = target - 'A';
+    }
+    else
+    {
+        row = target - '0';
+    }
+    if (col != -1)
+    {
+        for (int k = 0; k < 10; k++)
+        {
+            if (opponent->grid[k][col] == 'S')
+            {
+                opponent->grid[k][col] = '*';
+                hitcount++;
+            }
+            else if (diff == 0 && opponent->grid[k][col] == '~')
+            {
+                opponent->grid[k][col] = 'o';
+            }
+        }
+    }
+    else if (row != -1)
+    {
+        for (int k = 0; k < 10; k++)
+        {
+            if (opponent->grid[row][k] == 'S')
+            {
+                opponent->grid[row][k] = '*';
+                hitcount++;
+            }
+            else if (diff == 0 && opponent->grid[row][k] == '~')
+            {
+                opponent->grid[row][k] = 'o';
+            }
+        }
+    }
+    if (hitcount > 0)
+    {
+        printf("Torpedo Hit %d time(s)\n", hitcount);
+        for (int i = 0; i < 4; i++)
+        {
+            Ship *ship = &opponent->ships[i];
+            int ship_hit_count = 0;
+            if (ship->orientation == 'H' && row == ship->startrow)
+            {
+                for (int j = ship->startcolumn; j < ship->startcolumn + ship->size; j++)
+                {
+                    if (opponent->grid[ship->startrow][j] == '*')
+                    {
+                        ship_hit_count++;
+                    }
+                }
+            }
+            else if (ship->orientation == 'V' && col == ship->startcolumn)
+            {
+                for (int j = ship->startrow; j < ship->startrow + ship->size; j++)
+                {
+                    if (opponent->grid[j][ship->startcolumn] == '*')
+                    {
+                        ship_hit_count++;
+                    }
+                }
+            }
+            if (ship_hit_count == ship->size)
+            {
+                if (ship->size == 5)
+                {
+                    printf("You sunk a Carrier!\n");
+                }
+                else if (ship->size == 4)
+                {
+                    printf("You sunk a Battleship!\n");
+                }
+                else if (ship->size == 3)
+                {
+                    printf("You sunk a Destroyer!\n");
+                }
+                else if (ship->size == 2)
+                {
+                    printf("You sunk a Submarine!\n");
+                }
                 opponent->shipsr--;
             }
         }
@@ -387,11 +487,12 @@ void PlaceShip(player *player)
         int isValid = 0;
         while (!isValid)
         {
-            printf("Enter the coordinates for the %s and orientation(Horizental/Vertical): \n", ships[i]);
+            printf("Enter the coordinates for the %s and orientation (H/V): ", ships[i]);
             scanf(" %c %d %c", &column, &row, &orientation);
+            row -= 1;
             while (getchar() != '\n')
                 ;
-            isValid = isValidPlacement(player, column, row, orientation, size);
+            isValid = isValidPlacement(player, column, row + 1, orientation, size);
             if (!isValid)
             {
                 printf("Invalid placement. Try again.\n");
@@ -400,38 +501,23 @@ void PlaceShip(player *player)
         int ind = column - 'A';
         player->ships[i].size = shipSizes[i];
         player->ships[i].hits = 0;
-        player->ships[i].startrow = row - 1;
-        player->ships[i].startcolumn = column - 'A';
+        player->ships[i].startrow = row;
+        player->ships[i].startcolumn = ind;
         player->ships[i].orientation = orientation;
-        int j = 0;
-        while (j < 10)
-        {
-            if (j == row)
-                break;
-            j++;
-        }
-        int k = 0;
-        while (k < 10)
-        {
-            if (k == column - 'A')
-                break;
-            k++;
-        }
-
         if (orientation == 'H')
         {
-            while(j<size)
+            for (int j = 0; j < size; j++)
             {
-                player->grid[row - 1][ind + j] = 'S';
-                j++;
+                player->grid[row][ind + j] = 'S';
+                player->smokegrid[row][ind + j] = 'S';
             }
         }
         else if (orientation == 'V')
         {
-            while(k<size)
+            for (int j = 0; j < size; j++)
             {
-                player->grid[row - 1 + k][ind] = 'S';
-                k++;
+                player->grid[row + j][ind] = 'S';
+                player->smokegrid[row + j][ind] = 'S';
             }
         }
     }
@@ -449,53 +535,62 @@ int main()
     player2->radar = 3;
     player1->smoke = 0;
     player2->smoke = 0;
-    
     printf("Difficulty: Easy(0) / Hard(1): ");
     int diff;
     scanf("%d", &diff);
-
     printf("Enter first player's name: ");
     scanf("%s", player1->name);
     printf("Enter second player's name: ");
     scanf("%s", player2->name);
+    srand(time(NULL));
+    /* succussful attempt at randomly choosing without seed
+        int last;
+        int percent;
+        int arr[1];
+        int random = rand()%2;
+        if(random ==0){
+            int last = ((int)(&arr) % 10)%10;
+        }
+        else{
+            int last = (int)(&arr) % 10;
+        }
+        if(last%2==0){percent=0;}else{percent=1;}
+    */
 
     int percent = rand() % 2;
-    if (percent == 0) {
+    if (percent == 0)
+    {
         printf("%s, place your ships you're starting\n", player1->name);
         PlaceShip(player1);
-    } else {
+        system("clear");
+        printf("%s, place your ships \n", player2->name);
+        PlaceShip(player2);
+        system("clear");
+    }
+    else
+    {
         printf("%s, place your ships you're starting\n", player2->name);
         PlaceShip(player2);
-    }
-
-    // Ensure the other player also places their ships
-    if (percent == 0) {
-        printf("%s, now place your ships.\n", player2->name);
-        PlaceShip(player2);
-    } else {
-        printf("%s, now place your ships.\n", player1->name);
+        system("clear");
+        printf("%s, place your ships \n", player1->name);
         PlaceShip(player1);
+        system("clear");
     }
-
     int game_over = 0;
-
     while (!game_over)
     {
-        printf("\nCurrent Grid for %s:\n", player1->name);
-        displayGrid(player1->grid, diff);
+        printf("\n %s's current grid:\n", player2->name);
+        displayGrid(player2->grid, diff);
         handle_move(player1, player2, diff);
-
         if (player2->shipsr == 0)
         {
             printf("%s wins!\n", player1->name);
             game_over = 1;
             break;
         }
-
-        printf("\nCurrent Grid for %s:\n", player2->name);
-        displayGrid(player2->grid, diff);
+        printf("\n %s's current grid:\n", player1->name);
+        displayGrid(player1->grid, diff);
         handle_move(player2, player1, diff);
-
         if (player1->shipsr == 0)
         {
             printf("%s wins!\n", player2->name);
@@ -503,7 +598,6 @@ int main()
             break;
         }
     }
-
     free(player1);
     free(player2);
     return 0;
