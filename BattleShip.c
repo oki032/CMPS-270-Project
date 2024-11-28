@@ -491,7 +491,6 @@ void PlaceShip(player *player)
             scanf(" %c %d %c", &column, &row, &orientation);
             row -= 1;
             while (getchar() != '\n')
-                ;
             isValid = isValidPlacement(player, column, row + 1, orientation, size);
             if (!isValid)
             {
@@ -522,9 +521,62 @@ void PlaceShip(player *player)
         }
     }
 }
+void BotPlaceShip()
+{
+    char ships[4][20] = {{"Carrier"}, {"Battleship"}, {"Destroyer"}, {"Submarine"}};
+    int size = 5;
+    char column;
+    int row;
+    char orientation;
+    int shipSizes[4];
+    for (int i = 0; i < 4; i++)
+    {
+        size = size - i;
+        shipSizes[i] = size;
+        int isValid = 0;
+        while (!isValid)
+        {
+            srand(time(NULL));
+            column = rand()%10;
+            row= rand()%10;
+            int c= rand()%2;
+            char orientation=(c==1)?'H':'V';
+            row -= 1;
+            while (getchar() != '\n')
+            isValid = isValidPlacement(player, column, row + 1, orientation, size);
+            if (!isValid)
+            {
+                printf("Invalid placement. Try again.\n");
+            }
+        }
+        int ind = column - 'A';
+        player->ships[i].size = shipSizes[i];
+        player->ships[i].hits = 0;
+        player->ships[i].startrow = x;
+        player->ships[i].startcolumn = ind;
+        player->ships[i].orientation = orientation;
+        if (orientation == 'H')
+        {
+            for (int j = 0; j < size; j++)
+            {
+                player->grid[row][ind + j] = 'S';
+                player->smokegrid[row][ind + j] = 'S';
+            }
+        }
+        else if (orientation == 'V')
+        {
+            for (int j = 0; j < size; j++)
+            {
+                player->grid[row + j][ind] = 'S';
+                player->smokegrid[row + j][ind] = 'S';
+            }
+        }
+    }
+}
 int main()
 {
     player *player1, *player2;
+    char bot;
     player1 = malloc(sizeof(player));
     player2 = malloc(sizeof(player));
     CreateGrid(player1->grid, player1->smokegrid);
@@ -535,70 +587,122 @@ int main()
     player2->radar = 3;
     player1->smoke = 0;
     player2->smoke = 0;
-    printf("Difficulty: Easy(0) / Hard(1): ");
-    int diff;
-    scanf("%d", &diff);
-    printf("Enter first player's name: ");
-    scanf("%s", player1->name);
-    printf("Enter second player's name: ");
-    scanf("%s", player2->name);
-    srand(time(NULL));
-    /* succussful attempt at randomly choosing without seed
-        int last;
-        int percent;
-        int arr[1];
-        int random = rand()%2;
-        if(random ==0){
-            int last = ((int)(&arr) % 10)%10;
+    printf("Is Player 2 a bot? Y/N");
+    scanf("%c",&bot)
+    if(bot=='Y'){
+        printf("Enter first player's name: ");
+        scanf("%s", player1->name);
+        srand(time(NULL));
+        int percent = rand() % 2;
+        if (percent == 0)
+        {
+            printf("%s, place your ships you're starting\n", player1->name);
+            PlaceShip(player1);
+            system("clear");
+            printf("bot places ships \n");
+            PlaceShip(player2);
+            system("clear");
         }
-        else{
-            int last = (int)(&arr) % 10;
+        else
+        {
+            printf("bot will start placing ships\n");
+            PlaceShip(player2);
+            system("clear");
+            printf("%s, place your ships \n", player1->name);
+            PlaceShip(player1);
+            system("clear");
         }
-        if(last%2==0){percent=0;}else{percent=1;}
-    */
+        int game_over = 0;
+        while (!game_over)
+        {
+            printf("\n %s's current grid:\n", player2->name);
+            displayGrid(player2->grid, diff);
+            handle_move(player1, player2, diff);
+            if (player2->shipsr == 0)
+            {
+                printf("%s wins!\n", player1->name);
+                game_over = 1;
+                break;
+            }
+            printf("\n %s's current grid:\n", player1->name);
+            displayGrid(player1->grid, diff);
+            handle_move(player2, player1, diff);
+            if (player1->shipsr == 0)
+            {
+                printf("bot wins!\n");
+                game_over = 1;
+                break;
+            }
+        }
+        free(player1);
+        return 0;
+        }
+    }else if(bot=='N'){
+        printf("Difficulty: Easy(0) / Hard(1): ");
+        int diff;
+        scanf("%d", &diff);
+        printf("Enter first player's name: ");
+        scanf("%s", player1->name);
+        printf("Enter second player's name: ");
+        scanf("%s", player2->name);
+        srand(time(NULL));
+        /* succussful attempt at randomly choosing without seed
+            int last;
+            int percent;
+            int arr[1];
+            int random = rand()%2;
+            if(random ==0){
+                int last = ((int)(&arr) % 10)%10;
+            }
+            else{
+                int last = (int)(&arr) % 10;
+            }
+            if(last%2==0){percent=0;}else{percent=1;}
+        */
 
-    int percent = rand() % 2;
-    if (percent == 0)
-    {
-        printf("%s, place your ships you're starting\n", player1->name);
-        PlaceShip(player1);
-        system("clear");
-        printf("%s, place your ships \n", player2->name);
-        PlaceShip(player2);
-        system("clear");
-    }
-    else
-    {
-        printf("%s, place your ships you're starting\n", player2->name);
-        PlaceShip(player2);
-        system("clear");
-        printf("%s, place your ships \n", player1->name);
-        PlaceShip(player1);
-        system("clear");
-    }
-    int game_over = 0;
-    while (!game_over)
-    {
-        printf("\n %s's current grid:\n", player2->name);
-        displayGrid(player2->grid, diff);
-        handle_move(player1, player2, diff);
-        if (player2->shipsr == 0)
+        int percent = rand() % 2;
+        if (percent == 0)
         {
-            printf("%s wins!\n", player1->name);
-            game_over = 1;
-            break;
+            printf("%s, place your ships you're starting\n", player1->name);
+            PlaceShip(player1);
+            system("clear");
+            printf("%s, place your ships \n", player2->name);
+            PlaceShip(player2);
+            system("clear");
         }
-        printf("\n %s's current grid:\n", player1->name);
-        displayGrid(player1->grid, diff);
-        handle_move(player2, player1, diff);
-        if (player1->shipsr == 0)
+        else
         {
-            printf("%s wins!\n", player2->name);
-            game_over = 1;
-            break;
+            printf("%s, place your ships you're starting\n", player2->name);
+            PlaceShip(player2);
+            system("clear");
+            printf("%s, place your ships \n", player1->name);
+            PlaceShip(player1);
+            system("clear");
         }
-    }
-    free(player1);
-    free(player2);
-    return 0;
+        int game_over = 0;
+        while (!game_over)
+        {
+            printf("\n %s's current grid:\n", player2->name);
+            displayGrid(player2->grid, diff);
+            handle_move(player1, player2, diff);
+            if (player2->shipsr == 0)
+            {
+                printf("%s wins!\n", player1->name);
+                game_over = 1;
+                break;
+            }
+            printf("\n %s's current grid:\n", player1->name);
+            displayGrid(player1->grid, diff);
+            handle_move(player2, player1, diff);
+            if (player1->shipsr == 0)
+            {
+                printf("%s wins!\n", player2->name);
+                game_over = 1;
+                break;
+            }
+        }
+        free(player1);
+        free(player2);
+        return 0;
+        }
 }
