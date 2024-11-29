@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <math.h>
 typedef struct Ship
 {
     int hits;
@@ -13,6 +14,7 @@ typedef struct player
 {
     char name[50];
     char grid[10][10];
+    double botgrid[10][10];
     int radar;
     int shipsr;
     int smoke;
@@ -21,7 +23,7 @@ typedef struct player
     Ship ships[4];
 } player;
 void Fire(player *opponent, int row, char column, int diff, player *self);
-int RadarSweep(player *opponent, int row, int column, player *self);
+int RadarSweep(player *opponent, int row, char column, player *self);
 void SmokeScreen(player *opponent, int row, char column, player *self);
 void Artillery(int row, int col, char grid[10][10], player *opponent);
 void Torpedo(player *opponent, char target, int diff);
@@ -134,6 +136,43 @@ void handle_move(player *current_player, player *opponent, int diff)
         Torpedo(opponent, coor[0], diff);
     }
 }
+void bot_move(player *current_player, player *opponent, int percent, int round)
+{
+    int row=0;
+    int column=0;
+    int max=0;
+    for(int i=0;i<10;i++){
+        for(int j=0;j<10;j++){
+            if(current_player->grid[i][j]=='~' && current_player->botgrid[i][j]>max){
+                max=current_player->botgrid[i][j];
+                row=i;
+                column=j;
+            }
+        }
+    }
+    char col='A'+column;
+    if(current_player->radar>0 && opponent->shipsr>0){
+        RadarSweep(opponent, row, col,current_player);
+    }
+    if(current_player->smoke>0 && opponent->shipsr<5){
+        SmokeScreen(opponent, row, col, current_player);
+    }
+    if(current_player->artillery>0 && opponent->shipsr<5){
+        Artillery( row, column, opponent->grid,opponent);
+    }
+    if(opponent->shipsr<3){
+        int total1=0;
+        int total2=0;
+        for(int i=0; i<10;i++){
+            total1 += current_player->botgrid[row][i];
+            total2 += current_player->botgrid[i][column];
+        }
+        char target= (total1>total2)?col:row;
+        Torpedo(opponent, target, 1);
+    }
+    Fire(opponent, row, col, 1, current_player);
+
+}
 void displayGrid(char grid[10][10], int diff)
 {
     char c = 'A';
@@ -218,7 +257,7 @@ void Fire(player *opponent, int row, char column, int diff, player *self)
         }
     }
 }
-int RadarSweep(player *opponent, int row, int column, player *self)
+int RadarSweep(player *opponent, int row, char column, player *self)
 {
     if (self->radar > 0)
     {
@@ -521,7 +560,7 @@ void PlaceShip(player *player)
         }
     }
 }
-void BotPlaceShip()
+void BotPlaceShip(player player)
 {
     char ships[4][20] = {{"Carrier"}, {"Battleship"}, {"Destroyer"}, {"Submarine"}};
     int size = 5;
@@ -590,6 +629,31 @@ int main()
     printf("Is Player 2 a bot? Y/N");
     scanf("%c",&bot)
     if(bot=='Y'){
+        player2->name="bot";
+        double total=0;
+        for(int i=0; i<10; i++){
+            for(int j=0;j<0;j++){
+                if((i>=4 && i<=5)&&(j>=4 && j<=5)){
+                    player2->botgrid[i][j]=1.0;
+                }else{
+                    int distance5= abs(i-4)+abs(j-4);
+                    int distance6= abs(i-5)+abs(j-5);
+                    int mindistance=0;
+                    if(distance5>distance6){
+                        mindistance=distance6
+                    }else{
+                        mindistance=distance5; 
+                    }
+                    player2->botgrid[i][j]=1.0/1.0+mindistance;
+                    total+=player2->botgrid[i][j];
+                }
+            }
+        }
+         for(int i=0; i<10; i++){
+            for(int j=0;j<0;j++){
+                player2->botgrid[i][j]/=total;
+            }
+        }
         printf("Enter first player's name: ");
         scanf("%s", player1->name);
         srand(time(NULL));
@@ -600,40 +664,65 @@ int main()
             PlaceShip(player1);
             system("clear");
             printf("bot places ships \n");
-            PlaceShip(player2);
+            BotPlaceShip(player2);
             system("clear");
         }
         else
         {
             printf("bot will start placing ships\n");
-            PlaceShip(player2);
+            BotPlaceShip(player2);
             system("clear");
             printf("%s, place your ships \n", player1->name);
             PlaceShip(player1);
             system("clear");
         }
         int game_over = 0;
+        int round=1;
         while (!game_over)
         {
-            printf("\n %s's current grid:\n", player2->name);
-            displayGrid(player2->grid, diff);
-            handle_move(player1, player2, diff);
-            if (player2->shipsr == 0)
-            {
-                printf("%s wins!\n", player1->name);
-                game_over = 1;
-                break;
+            if(percent==0){
+                printf("\n bots's current grid:\n");
+                displayGrid(player2->grid, diff);
+                handle_move(player1, player2, diff);
+                if (player2->shipsr == 0)
+                {
+                    printf("%s wins!\n", player1->name);
+                    game_over = 1;
+                    break;
+                }
+                printf("\n %s's current grid:\n", player1->name);
+                displayGrid(player1->grid, diff);
+                handle_move(player2, player1, diff);
+                if (player1->shipsr == 0)
+                {
+                    printf("bot wins!\n");
+                    game_over = 1;
+                    break;
+                }
+           
+            }else{
+                printf("\n %s's current grid:\n",player1->name);
+                displayGrid(player1->grid, diff);
+                handle_move(player2, player1, diff);
+                if (player2->shipsr == 0)
+                {
+                    printf("%s wins!\n", player1->name);
+                    game_over = 1;
+                    break;
+                }
+                printf("\n %s's current grid:\n", player1->name);
+                displayGrid(player1->grid, diff);
+                handle_move(player2, player1, diff);
+                if (player1->shipsr == 0)
+                {
+                    printf("bot wins!\n");
+                    game_over = 1;
+                    break;
+                }
             }
-            printf("\n %s's current grid:\n", player1->name);
-            displayGrid(player1->grid, diff);
-            handle_move(player2, player1, diff);
-            if (player1->shipsr == 0)
-            {
-                printf("bot wins!\n");
-                game_over = 1;
-                break;
-            }
+        round++;
         }
+         
         free(player1);
         return 0;
         }
@@ -705,4 +794,3 @@ int main()
         free(player2);
         return 0;
         }
-}
