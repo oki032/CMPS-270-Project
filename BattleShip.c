@@ -92,7 +92,19 @@ int main()
 
     srand(time(NULL));
     int startingPlayer = rand() % 2; 
-
+    /* successful attempt at randomly choosing without seed
+        int last;
+        int percent;
+        int arr[1];
+        int random = rand()%2;
+        if(random ==0){
+            int last = ((int)(&arr) % 10)%10;
+        }
+        else{
+            int last = (int)(&arr) % 10;
+        }
+        if(last%2==0){percent=0;}else{percent=1;}
+    */
 
     if (startingPlayer == 0)
     {
